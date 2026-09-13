@@ -1,0 +1,19 @@
+<script>
+/**
+ * 应用入口：全局生命周期
+ * 全局共享数据（健康数据最近采样、会话记录）放在 app 级，页面间传递更简单。
+ */
+export default {
+  onCreate() {
+    console.info('breathcoach app onCreate')
+    // 最近一次健康采样快照，供跨页面读取
+    this.globalData = {
+      // 呼吸训练会话结果 { beforeStress, afterStress, beforeHr, afterHr, durationSec }
+      lastSession: null
+    }
+  },
+  onDestroy() {
+    console.info('breathcoach app onDestroy')
+  }
+}
+</script>

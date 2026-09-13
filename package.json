@@ -1,0 +1,9 @@
+{
+  "name": "breathcoach",
+  "version": "1.0.0",
+  "description": "静息 - AI 压力呼吸教练（openvela 手表快应用，2026 openvela AI 硬件开发者大赛 - 手表应用创新赛道）",
+  "main": "src/app.ux",
+  "devDependencies": {
+    "aiot-toolkit": "^2.0.5"
+  }
+}
