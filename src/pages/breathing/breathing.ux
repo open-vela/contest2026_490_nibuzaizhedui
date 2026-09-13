@@ -367,7 +367,7 @@ export default {
         }
       }
     }
-    this.animateBubbles(f)
+    this.animateBubbles()
     this.animateRipple()
   },
   /** 背景光斑慢漂：周期错开，让玻璃圆背后持续有东西"透"过去 */
@@ -390,7 +390,7 @@ export default {
     this.w2o = Math.round((0.4 + 0.4 * Math.sin(t / 110 + 1.5)) * 100) / 100
   },
   /** 训练气泡：呼气灵动上飘消散（拉长变形+横向摆动），吸气轻微上浮，屏息悬停微闪 */
-  animateBubbles(f) {
+  animateBubbles() {
     const phase = this._pattern.phases[this._phaseIdx]
     const p = Math.min(1, this._elapsedInPhase / phase.ms)
     for (let i = 0; i < BUBBLE_ANCHORS.length; i++) {
@@ -507,7 +507,6 @@ export default {
           session.beforeStress - session.afterStress > 0)) {
       return
     }
-    const xs = [60, 150, 250, 345]
     this._fxTick = 0
     this._fxTimer = setInterval(() => {
       this._fxTick++
