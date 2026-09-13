@@ -1,0 +1,51 @@
+{
+  "package": "com.vela.breathcoach",
+  "name": "静息",
+  "versionName": "1.0.0",
+  "versionCode": 1,
+  "icon": "/common/images/logo.png",
+  "deviceTypeList": ["watch"],
+  "features": [
+    { "name": "service.health" },
+    { "name": "system.velaclaw" },
+    { "name": "system.router" },
+    { "name": "system.app" }
+  ],
+  "permissions": [
+    { "name": "hapjs.permission.HEALTH" }
+  ],
+  "config": {
+    "designWidth": 466,
+    "background": {
+      "features": ["service.health"]
+    }
+  },
+  "router": {
+    "entry": "pages/home",
+    "pages": {
+      "pages/home": {
+        "component": "home"
+      },
+      "pages/breathing": {
+        "component": "breathing"
+      },
+      "pages/assistant": {
+        "component": "assistant"
+      }
+    }
+  },
+  "display": {
+    "backgroundColor": "#0b1220",
+    "pages": {
+      "pages/home": {
+        "title": "静息"
+      },
+      "pages/breathing": {
+        "title": "呼吸训练"
+      },
+      "pages/assistant": {
+        "title": "AI 助手"
+      }
+    }
+  }
+}

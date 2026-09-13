@@ -1,0 +1,540 @@
+<template>
+  <div class="page">
+    <!-- 返回按钮（左上角玻璃圆，训练中可随时退出） -->
+    <div class="back-btn" onclick="goHome" if="{{ !finished }}">
+      <text class="back-icon">←</text>
+    </div>
+
+    <!-- 训练中：液态玻璃呼吸圆 + 气泡 -->
+    <div class="stage" if="{{ !finished }}">
+      <text class="pattern-name">{{ patternShort }}</text>
+      <image class="bg-glow" src="/common/images/glow_teal.png" style="left: {{w1x}}px; top: {{w1y}}px; width: 200px; height: 200px; opacity: {{w1o}};"></image>
+      <image class="bg-glow" src="/common/images/glow_blue.png" style="left: {{w2x}}px; top: {{w2y}}px; width: 160px; height: 160px; opacity: {{w2o}};"></image>
+      <div class="breath-circle" style="width: {{circleW}}px; height: {{circleH}}px;">
+        <image class="glass-img" src="/common/images/soap_{{soapIdx}}.png"></image>
+        <div class="glass-tint" style="border-radius: {{glassR}}px; background-color: {{phaseTint}};"></div>
+        <div class="ripple" style="left: {{rippleM}}px; top: {{rippleM}}px; width: {{rippleSize}}px; height: {{rippleSize}}px; opacity: {{rippleOp}};"></div>
+        <image class="bubble" src="/common/images/soap_{{soapIdx}}.png" style="left: {{b1x}}%; top: {{b1y}}%; width: {{b1s}}px; height: {{b1h}}px; opacity: {{b1o}};"></image>
+        <image class="bubble" src="/common/images/soap_{{soapIdx}}.png" style="left: {{b2x}}%; top: {{b2y}}%; width: {{b2s}}px; height: {{b2h}}px; opacity: {{b2o}};"></image>
+        <image class="bubble" src="/common/images/soap_{{soapIdx}}.png" style="left: {{b3x}}%; top: {{b3y}}%; width: {{b3s}}px; height: {{b3h}}px; opacity: {{b3o}};"></image>
+        <image class="bubble" src="/common/images/soap_{{soapIdx}}.png" style="left: {{b4x}}%; top: {{b4y}}%; width: {{b4s}}px; height: {{b4h}}px; opacity: {{b4o}};"></image>
+        <text class="phase-label" style="color: {{phaseLabelColor}};">{{ phaseLabel }}</text>
+      </div>
+      <text class="remain">{{ remainText }}</text>
+    </div>
+
+    <!-- 结束：前后对比 + AI 建议 -->
+    <div class="summary" if="{{ finished }}">
+      <div class="burst" style="left: {{q1x}}px; top: {{q1y}}px; opacity: {{q1o}};"></div>
+      <div class="burst" style="left: {{q2x}}px; top: {{q2y}}px; opacity: {{q2o}};"></div>
+      <div class="burst" style="left: {{q3x}}px; top: {{q3y}}px; opacity: {{q3o}};"></div>
+      <div class="burst" style="left: {{q4x}}px; top: {{q4y}}px; opacity: {{q4o}};"></div>
+      <text class="sum-title">训练完成</text>
+      <div class="compare-row">
+        <div class="compare-col">
+          <text class="compare-num">{{ beforeStress }}</text>
+          <text class="compare-cap">训练前压力</text>
+        </div>
+        <text class="arrow">→</text>
+        <div class="compare-col">
+          <text class="compare-num" style="color: {{deltaColor}};">{{ displayAfter }}</text>
+          <text class="compare-cap">训练后压力</text>
+        </div>
+      </div>
+      <text class="delta-text" style="color: {{deltaColor}};">{{ deltaText }}</text>
+      <text class="hr-delta">心率 {{ beforeHr }} → {{ afterHr }} bpm</text>
+
+      <text class="ai-title">AI 建议</text>
+      <text class="ai-text">{{ aiAdvice }}</text>
+
+      <div class="btn" onclick="goHome">
+        <text class="btn-text">回到首页</text>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style>
+.page {
+  flex-direction: column;
+  background-color: #0b1220;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 24px;
+}
+/* 返回按钮：左上 45° 圆屏安全区内（角落会被圆形表盘裁掉，不能放） */
+.back-btn {
+  position: absolute;
+  left: 60px;
+  top: 90px;
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  background-color: rgba(22, 35, 58, 0.8);
+  border-width: 1px;
+  border-style: solid;
+  border-color: rgba(255, 255, 255, 0.35);
+  align-items: center;
+  justify-content: center;
+}
+.back-icon {
+  font-size: 26px;
+  color: #d5dce6;
+}
+.stage {
+  flex-direction: column;
+  align-items: center;
+}
+.pattern-name {
+  font-size: 20px;
+  color: #5d6b7f;
+  margin-bottom: 16px;
+}
+/* 背景漂移光斑：柔和径向光晕贴图，从玻璃圆背后经过，让"朦胧透光"有内容可透 */
+.bg-glow {
+  position: absolute;
+}
+.breath-circle {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+/* 液态玻璃：离线渲染的模糊/折射材质图（引擎不支持 backdrop-filter，见 docs 坑 15） */
+.glass-img {
+  position: absolute;
+  left: 0px;
+  top: 0px;
+  width: 100%;
+  height: 100%;
+}
+/* 相位色 tint：20%-30% 半透明青绿填充 + 1px 40% 白色内描边 */
+.glass-tint {
+  position: absolute;
+  left: 0px;
+  top: 0px;
+  width: 100%;
+  height: 100%;
+  border-width: 1px;
+  border-style: solid;
+  border-color: rgba(255, 255, 255, 0.4);
+}
+.phase-label {
+  font-size: 36px;
+  font-weight: 700;
+}
+.remain {
+  font-size: 20px;
+  color: #5d6b7f;
+  margin-top: 16px;
+}
+.bubble {
+  position: absolute;
+}
+.ripple {
+  position: absolute;
+  border-radius: 200px;
+  border-width: 2px;
+  border-style: solid;
+  border-color: rgba(230, 255, 251, 0.7);
+  background-color: transparent;
+}
+.summary {
+  flex-direction: column;
+  align-items: center;
+  width: 420px;
+}
+.burst {
+  position: absolute;
+  border-radius: 16px;
+  background-color: #2dd4bf;
+}
+.sum-title {
+  font-size: 28px;
+  color: #ffffff;
+  font-weight: 700;
+}
+.compare-row {
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: center;
+  margin-top: 8px;
+}
+.compare-col {
+  flex-direction: column;
+  align-items: center;
+  margin: 0 16px;
+}
+.compare-num {
+  font-size: 46px;
+  color: #aeb8c8;
+  font-weight: 700;
+}
+.compare-cap {
+  font-size: 16px;
+  color: #5d6b7f;
+  margin-top: 2px;
+}
+.arrow {
+  font-size: 26px;
+  color: #5d6b7f;
+  margin-bottom: 24px;
+}
+.delta-text {
+  font-size: 22px;
+  margin-top: 6px;
+  font-weight: 600;
+}
+.hr-delta {
+  font-size: 18px;
+  color: #aeb8c8;
+  margin-top: 4px;
+}
+.ai-title {
+  font-size: 18px;
+  color: #4fc3f7;
+  margin-top: 8px;
+  font-weight: 600;
+}
+.ai-text {
+  font-size: 16px;
+  color: #d5dce6;
+  line-height: 22px;
+  text-align: center;
+  width: 380px;
+  margin-top: 2px;
+  lines: 4;
+  text-overflow: ellipsis;
+}
+.btn {
+  flex-direction: column;
+  width: 200px;
+  height: 50px;
+  border-radius: 25px;
+  background-color: #2dd4bf;
+  background-image: linear-gradient(180deg, #5be6d1 0%, #1fb7a2 100%);
+  border-width: 1px;
+  border-style: solid;
+  border-color: rgba(255, 255, 255, 0.4);
+  align-items: center;
+  justify-content: center;
+  margin-top: 10px;
+}
+.btn-text {
+  font-size: 22px;
+  color: #06251f;
+  font-weight: 700;
+}
+</style>
+
+<script>
+import router from '@system.router'
+import { PATTERNS, frame, cycleMs, avg, SIZE } from '../../common/breathing.js'
+import { subscribe, DATA_TYPES } from '../../common/health.js'
+import { ask, buildAdviceQuery } from '../../common/ai.js'
+
+/** 各模式训练轮数：4-2-6 每轮 12s×6=72s；4-7-8 每轮 19s×4=76s，总时长接近 */
+const PATTERN_CYCLES = { calm: 6, sleep: 4 }
+const DEFAULT_PATTERN_KEY = 'calm'
+const TICK_MS = 50
+
+/** 相位 tint：肥皂泡本体是中性透明虹彩，tint 压到 ~10%-16% 只做相位色提示 */
+const PHASE_STYLE = {
+  '吸气': { tint: 'rgba(45, 212, 191, 0.12)', fg: '#e6fffb' },
+  '屏息': { tint: 'rgba(125, 211, 252, 0.10)', fg: '#e6fffb' },
+  '呼气': { tint: 'rgba(15, 118, 110, 0.16)', fg: '#e6fffb' }
+}
+
+/** 训练气泡横向锚点与相位错峰 */
+const BUBBLE_ANCHORS = [
+  { x: 28, off: 0.00 },
+  { x: 60, off: 0.24 },
+  { x: 44, off: 0.50 },
+  { x: 72, off: 0.74 }
+]
+
+export default {
+  // 首页 router.push 传入的参数会自动绑定到 public 数据
+  public: {
+    currentStress: null,
+    currentHr: null,
+    patternKey: DEFAULT_PATTERN_KEY
+  },
+  private: {
+    circleW: SIZE.min,
+    circleH: SIZE.min,
+    glassR: Math.round(SIZE.min / 2),
+    soapIdx: 0,
+    phaseLabel: '准备',
+    phaseTint: PHASE_STYLE['吸气'].tint,
+    phaseLabelColor: PHASE_STYLE['吸气'].fg,
+    w1x: 60, w1y: 150, w1o: 0.6,
+    w2x: 240, w2y: 260, w2o: 0.5,
+    remainText: '',
+    finished: false,
+    patternShort: PATTERNS[DEFAULT_PATTERN_KEY].short,
+    beforeStress: '--',
+    afterStress: '--',
+    displayAfter: '--',
+    beforeHr: '--',
+    afterHr: '--',
+    deltaText: '',
+    deltaColor: '#aeb8c8',
+    aiAdvice: '正在生成…',
+    rippleSize: 0,
+    rippleM: 0,
+    rippleOp: 0,
+    b1x: 28, b1y: 90, b1s: 8, b1h: 8, b1r: 4, b1o: 0,
+    b2x: 60, b2y: 90, b2s: 8, b2h: 8, b2r: 4, b2o: 0,
+    b3x: 44, b3y: 90, b3s: 8, b3h: 8, b3r: 4, b3o: 0,
+    b4x: 72, b4y: 90, b4s: 8, b4h: 8, b4r: 4, b4o: 0,
+    q1x: 60, q1y: 300, q1o: 0,
+    q2x: 160, q2y: 320, q2o: 0,
+    q3x: 260, q3y: 300, q3o: 0,
+    q4x: 350, q4y: 330, q4o: 0
+  },
+  onReady() {
+    // 首页选择的模式（calm 平复 / sleep 助眠），未传时回落到平复
+    this._pattern = PATTERNS[this.patternKey] || PATTERNS[DEFAULT_PATTERN_KEY]
+    this.patternShort = this._pattern.short
+    this._cycles = PATTERN_CYCLES[this.patternKey] || PATTERN_CYCLES[DEFAULT_PATTERN_KEY]
+    this._phaseIdx = 0
+    this._elapsedInPhase = 0
+    this._cyclesLeft = this._cycles
+    this._stressSamples = []
+    this._hrSamples = []
+
+    // 参数由首页带入，作为“训练前”基线
+    const params = this
+    this.beforeStress = params.currentStress != null ? params.currentStress : '--'
+    this.beforeHr = params.currentHr != null ? params.currentHr : '--'
+
+    // 训练期间持续采样，取末段均值作为“训练后”数据
+    this._unsubStress = subscribe(DATA_TYPES.STRESS, (v) => { this._stressSamples.push(v) })
+    this._unsubHr = subscribe(DATA_TYPES.HEART_RATE, (v) => { this._hrSamples.push(v) })
+
+    this.remainText = this._pattern.name + ' · 共 ' + this._cycles + ' 组 · 约 ' +
+      Math.round(cycleMs(this._pattern) * this._cycles / 1000) + ' 秒'
+    this._timer = setInterval(() => this.tick(), TICK_MS)
+  },
+  onDestroy() {
+    if (this._timer) clearInterval(this._timer)
+    if (this._fxTimer) clearInterval(this._fxTimer)
+    if (this._rollTimer) clearInterval(this._rollTimer)
+    if (this._unsubStress) this._unsubStress()
+    if (this._unsubHr) this._unsubHr()
+  },
+  tick() {
+    // 用真实时间戳推进相位：该模拟器 setInterval 触发频率偏高，
+    // 按次数累计会导致呼吸节奏比标注快数倍
+    const now = (new Date()).getTime()
+    if (this._lastTs == null) {
+      this._lastTs = now
+    }
+    const delta = Math.min(250, now - this._lastTs)
+    this._lastTs = now
+    this._elapsedInPhase += delta
+    const f = frame(this._pattern, this._phaseIdx, this._elapsedInPhase)
+    // 挤压拉伸（squash & stretch）：相位中段形变最大，切换瞬间回正，像果冻
+    const phase = this._pattern.phases[this._phaseIdx]
+    const prog = Math.min(1, this._elapsedInPhase / phase.ms)
+    let sq = phase.hold ? 0 : 0.055 * Math.sin(prog * Math.PI)
+    if (phase.target !== 1) {
+      sq = -sq
+    }
+    this.circleW = Math.round(f.size * (1 - sq))
+    this.circleH = Math.round(f.size * (1 + sq))
+    this.glassR = Math.round(Math.min(this.circleW, this.circleH) / 2)
+    this.animateGlows()
+    this.phaseLabel = f.label
+    const st = PHASE_STYLE[f.label]
+    if (st) {
+      this.phaseTint = st.tint
+      this.phaseLabelColor = st.fg
+    }
+    if (f.phaseDone) {
+      // 相位切换：从圆环边缘荡开一圈涟漪
+      this.rippleSize = Math.round(f.size)
+      this.rippleM = -Math.round(f.size / 2)
+      this.rippleOp = 0.55
+      this._elapsedInPhase = 0
+      this._phaseIdx++
+      if (this._phaseIdx >= this._pattern.phases.length) {
+        this._phaseIdx = 0
+        this._cyclesLeft--
+        if (this._cyclesLeft <= 0) {
+          this.finish()
+          return
+        }
+      }
+    }
+    this.animateBubbles(f)
+    this.animateRipple()
+  },
+  /** 背景光斑慢漂：周期错开，让玻璃圆背后持续有东西"透"过去 */
+  animateGlows() {
+    // 虹彩轮播：每 4 个 tick（约 200ms）切一帧，8 帧一轮约 1.6s，柔和变幻
+    this._st = (this._st || 0) + 1
+    if (this._st % 4 === 0) {
+      this.soapIdx = (this.soapIdx + 1) % 8
+    }
+    if (this._bt == null) {
+      this._bt = 0
+    }
+    this._bt++
+    const t = this._bt
+    this.w1x = Math.round(40 + 70 * Math.sin(t / 130))
+    this.w1y = Math.round(120 + 120 * Math.sin(t / 210 + 1))
+    this.w1o = Math.round((0.5 + 0.4 * Math.sin(t / 90)) * 100) / 100
+    this.w2x = Math.round(220 + 80 * Math.sin(t / 170 + 2))
+    this.w2y = Math.round(230 + 110 * Math.sin(t / 260 + 0.6))
+    this.w2o = Math.round((0.4 + 0.4 * Math.sin(t / 110 + 1.5)) * 100) / 100
+  },
+  /** 训练气泡：呼气灵动上飘消散（拉长变形+横向摆动），吸气轻微上浮，屏息悬停微闪 */
+  animateBubbles(f) {
+    const phase = this._pattern.phases[this._phaseIdx]
+    const p = Math.min(1, this._elapsedInPhase / phase.ms)
+    for (let i = 0; i < BUBBLE_ANCHORS.length; i++) {
+      const anchor = BUBBLE_ANCHORS[i]
+      const bp = (p + anchor.off) % 1
+      let y, op, size, stretch
+      if (phase.hold) {
+        y = 42 + 8 * bp
+        op = 0.22 + 0.12 * Math.sin(bp * 6.28)
+        size = 10
+        stretch = 1
+      } else if (phase.target === 1) {
+        y = 76 - 18 * bp
+        op = 0.06 + 0.16 * (1 - bp)
+        size = 8 + 8 * bp
+        stretch = 1.12
+      } else {
+        y = 84 - 66 * bp
+        op = 0.05 + 0.55 * (1 - bp)
+        size = 7 + 12 * bp
+        // 上升加速段明显拉长，接近消散时变细
+        stretch = 1.15 + 0.45 * bp
+      }
+      const idx = i + 1
+      const sway = 2.5 * Math.sin(bp * 6.28 + i * 1.7)
+      const bw = Math.max(2, Math.round(size * (2 - stretch)))
+      const bh = Math.max(2, Math.round(size * stretch))
+      this['b' + idx + 'x'] = Math.round((anchor.x + sway) * 10) / 10
+      this['b' + idx + 'y'] = Math.round(y)
+      this['b' + idx + 's'] = bw
+      this['b' + idx + 'h'] = bh
+      this['b' + idx + 'r'] = Math.round(Math.min(bw, bh) / 2)
+      this['b' + idx + 'o'] = Math.round(op * 100) / 100
+    }
+  },
+  /** 相位涟漪扩散 */
+  animateRipple() {
+    if (this.rippleOp > 0) {
+      this.rippleSize = this.rippleSize + 7
+      this.rippleM = -Math.round(this.rippleSize / 2)
+      this.rippleOp = Math.max(0, Math.round((this.rippleOp - 0.05) * 100) / 100)
+    }
+  },
+  finish() {
+    if (this._timer) clearInterval(this._timer)
+    this.rippleOp = 0
+    if (this._unsubStress) this._unsubStress()
+    if (this._unsubHr) this._unsubHr()
+
+    // 训练后数据：取最后 10 秒样本均值，更能反映训练效果
+    const tail = (arr) => avg(arr.slice(-10))
+    const afterStress = tail(this._stressSamples)
+    const afterHr = tail(this._hrSamples)
+
+    this.afterStress = afterStress != null ? afterStress : '--'
+    this.afterHr = afterHr != null ? afterHr : '--'
+    this.finished = true
+
+    const session = {
+      beforeStress: this.beforeStress === '--' ? null : this.beforeStress,
+      afterStress: afterStress,
+      beforeHr: this.beforeHr === '--' ? null : this.beforeHr,
+      afterHr: afterHr,
+      durationSec: Math.round(cycleMs(this._pattern) * this._cycles / 1000)
+    }
+
+    // 展示前后对比
+    if (session.beforeStress != null && afterStress != null) {
+      const drop = session.beforeStress - afterStress
+      if (drop > 0) {
+        this.deltaText = '压力下降 ' + drop
+        this.deltaColor = '#3ddc97'
+      } else if (drop < 0) {
+        this.deltaText = '压力上升 ' + (-drop)
+        this.deltaColor = '#ff6b6b'
+      } else {
+        this.deltaText = '压力持平'
+        this.deltaColor = '#aeb8c8'
+      }
+    } else {
+      this.deltaText = ''
+    }
+
+    this.rollAfterNumber(session)
+    this.celebrate(session)
+    this.requestAdvice(session)
+  },
+  /** 训练后压力数字从“训练前”滚动到真实值 */
+  rollAfterNumber(session) {
+    const target = session.afterStress
+    this.displayAfter = this.beforeStress
+    if (target == null || session.beforeStress == null || target === session.beforeStress) {
+      this.displayAfter = this.afterStress
+      return
+    }
+    const from = session.beforeStress
+    let step = 0
+    const steps = 14
+    this._rollTimer = setInterval(() => {
+      step++
+      const t = step / steps
+      const eased = 1 - Math.pow(1 - t, 2)
+      this.displayAfter = Math.round(from + (target - from) * eased)
+      if (step >= steps) {
+        clearInterval(this._rollTimer)
+        this._rollTimer = null
+        this.displayAfter = target
+      }
+    }, 55)
+  },
+  /** 压力下降时来一串上升小气泡庆祝 */
+  celebrate(session) {
+    if (!(session.beforeStress != null && session.afterStress != null &&
+          session.beforeStress - session.afterStress > 0)) {
+      return
+    }
+    const xs = [60, 150, 250, 345]
+    this._fxTick = 0
+    this._fxTimer = setInterval(() => {
+      this._fxTick++
+      const t = this._fxTick / 24
+      for (let i = 0; i < 4; i++) {
+        const idx = i + 1
+        const bp = Math.min(1, t + i * 0.18)
+        this['q' + idx + 'y'] = Math.round(330 - 240 * bp)
+        this['q' + idx + 'o'] = Math.round((bp >= 1 ? 0 : 0.55 * (1 - bp)) * 100) / 100
+      }
+      if (this._fxTick > 26) {
+        clearInterval(this._fxTimer)
+        this._fxTimer = null
+      }
+    }, 100)
+  },
+  requestAdvice(session) {
+    ask(buildAdviceQuery(session), (reply) => {
+      this.aiAdvice = reply
+    })
+  },
+  /** 训练中途退出：停定时器、退订阅，避免后台泄漏 */
+  goHome() {
+    if (this._timer) clearInterval(this._timer)
+    if (this._unsubStress) this._unsubStress()
+    if (this._unsubHr) this._unsubHr()
+    router.back()
+  }
+}
+</script>

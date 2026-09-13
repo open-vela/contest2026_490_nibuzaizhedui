@@ -1,0 +1,11 @@
+node_modules/
+dist/
+build/
+sign/
+.build/
+.temp_*/
+*.rpk
+.DS_Store
+Thumbs.db
+*.log
+.idea/

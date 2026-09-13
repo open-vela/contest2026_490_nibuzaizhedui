@@ -1,0 +1,256 @@
+<template>
+  <div class="page">
+    <!-- 标题行可点返回（圆屏角落会被裁，浮动按钮会被气泡盖住，行内返回最稳） -->
+    <div class="title-row" onclick="goBack">
+      <text class="back-icon">← </text>
+      <text class="title">AI 放松助手</text>
+    </div>
+
+    <!-- 用户提问：右侧玻璃气泡 -->
+    <div class="row-right" if="{{ lastQuestion }}">
+      <div class="msg-user" style="opacity: {{aiOp}}; transform: scale({{aiScale}});">
+        <text class="msg-user-text">{{ lastQuestion }}</text>
+      </div>
+    </div>
+
+    <!-- AI 回复：左侧玻璃气泡，等待时打字动画 -->
+    <div class="row-left">
+      <div class="msg-ai" style="opacity: {{aiOp}}; transform: scale({{aiScale}});">
+        <div class="msg-ai-shine"></div>
+        <text class="msg-ai-text">{{ thinking ? dots : replyText }}</text>
+      </div>
+    </div>
+
+    <!-- 快捷提问（常驻，支持连续追问） -->
+    <div class="chips-row1">
+      <div class="chip" onclick="askStress">
+        <text class="chip-text">我的压力怎么样</text>
+      </div>
+      <div class="chip" onclick="askRelax">
+        <text class="chip-text">给我放松建议</text>
+      </div>
+    </div>
+    <div class="chips-row2">
+      <div class="chip" onclick="askHr">
+        <text class="chip-text">我的心率正常吗</text>
+      </div>
+      <div class="chip" onclick="askSleep">
+        <text class="chip-text">怎么睡个好觉</text>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style>
+.page {
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 28px;
+  background-color: #0b1220;
+}
+/* 标题行整体可点返回：← 在圆屏安全区内 */
+.title-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+.back-icon {
+  font-size: 24px;
+  color: #d5dce6;
+  margin-right: 10px;
+}
+.title {
+  font-size: 24px;
+  color: #4fc3f7;
+  font-weight: 600;
+  margin-bottom: 0px;
+}
+.row-right {
+  width: 420px;
+  flex-direction: row;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+.row-left {
+  width: 420px;
+  flex-direction: row;
+  justify-content: flex-start;
+  margin-top: 6px;
+}
+.msg-user {
+  max-width: 280px;
+  /* 虹彩粉彩渐变：与训练页肥皂泡同一套色板（淡粉-青-金-浅紫） */
+  background-color: #2dd4bf;
+  background-image: linear-gradient(135deg, rgba(255, 196, 210, 0.9) 0%, rgba(154, 232, 240, 0.9) 50%, rgba(255, 226, 158, 0.9) 100%);
+  border-width: 1px;
+  border-style: solid;
+  border-color: rgba(255, 255, 255, 0.5);
+  border-radius: 16px 16px 4px 16px;
+  padding: 8px 14px;
+}
+.msg-user-text {
+  font-size: 18px;
+  color: #0a2a30;
+  font-weight: 600;
+  line-height: 24px;
+}
+/* iMessage 玻璃气泡：半透明渐变 + 细亮边 + 顶部高光条 */
+.msg-ai {
+  width: 330px;
+  min-height: 84px;
+  background-color: rgba(16, 26, 44, 0.72);
+  background-image: linear-gradient(180deg, rgba(48, 66, 96, 0.55) 0%, rgba(16, 26, 44, 0.35) 100%);
+  border-width: 1px;
+  border-style: solid;
+  border-color: rgba(255, 255, 255, 0.22);
+  border-radius: 16px 16px 16px 4px;
+  padding: 12px 16px;
+}
+.msg-ai-shine {
+  position: absolute;
+  left: 10px;
+  top: 0px;
+  width: 200px;
+  height: 14px;
+  border-radius: 10px;
+  background-color: rgba(255, 255, 255, 0.10);
+  background-image: linear-gradient(90deg, rgba(255, 196, 210, 0.30) 0%, rgba(154, 232, 240, 0.30) 50%, rgba(206, 184, 252, 0.30) 100%);
+}
+.msg-ai-text {
+  font-size: 18px;
+  color: #d5dce6;
+  line-height: 24px;
+  text-align: left;
+  lines: 4;
+  text-overflow: ellipsis;
+}
+.chips-row1 {
+  flex-direction: row;
+  margin-top: 12px;
+}
+.chips-row2 {
+  flex-direction: row;
+  margin-top: 10px;
+}
+.chip {
+  background-color: rgba(22, 35, 58, 0.75);
+  background-image: linear-gradient(180deg, rgba(58, 78, 112, 0.5) 0%, rgba(22, 35, 58, 0.3) 100%);
+  border-width: 1px;
+  border-style: solid;
+  border-color: rgba(255, 255, 255, 0.18);
+  border-radius: 20px;
+  padding: 6px 10px;
+  margin: 0 6px;
+}
+.chip-text {
+  font-size: 16px;
+  color: #8fb8d8;
+}
+</style>
+
+<script>
+import router from '@system.router'
+import { ask, aiAvailable } from '../../common/ai.js'
+import { getRecent, stressLevel, DATA_TYPES } from '../../common/health.js'
+
+const DOTS = ['·', '··', '···']
+
+export default {
+  data: {
+    lastQuestion: '',
+    replyText: '你好，我是你的腕上放松助手。点下方问题开始对话。',
+    thinking: false,
+    dots: '·',
+    aiOp: 1,
+    aiScale: 1
+  },
+  onReady() {
+    // 页面打开即感知当前压力，作为回答上下文
+    getRecent([DATA_TYPES.STRESS, DATA_TYPES.HEART_RATE]).then((map) => {
+      if (this.thinking) {
+        return
+      }
+      const s = map[DATA_TYPES.STRESS]
+      const hr = map[DATA_TYPES.HEART_RATE]
+      const env = aiAvailable() ? '端侧 AI 已连接' : '端侧 AI 未连接（本地建议模式）'
+      const ctx = (s != null ? '当前压力 ' + s + '（' + stressLevel(s).label + '）' : '') +
+        (hr != null ? '，心率 ' + hr + ' bpm' : '')
+      this.replyText = env + (ctx ? '\n' + ctx : '')
+      this._ctx = ctx
+      this._hrCtx = hr != null ? hr : null
+    })
+  },
+  onDestroy() {
+    if (this._dotsTimer) clearInterval(this._dotsTimer)
+  },
+  onInput(e) {
+    this.draft = e.value
+  },
+  goBack() {
+    router.back()
+  },
+  askStress() {
+    const s = this._ctx ? this._ctx : ''
+    this.submit('我的压力' + (s ? '' : '怎么样') + '？' + s)
+  },
+  askRelax() {
+    this.submit('给我几条适合现在做的放松建议')
+  },
+  askHr() {
+    const hr = this._hrCtx != null ? '我心率 ' + this._hrCtx + '，' : ''
+    this.submit(hr + '我的心率正常吗？')
+  },
+  askSleep() {
+    this.submit('怎么睡个好觉')
+  },
+  submit(q) {
+    this.lastQuestion = q
+    this.thinking = true
+    this.replyText = ''
+    this.startDots()
+    ask(q, (reply) => {
+      this.stopDots()
+      this.replyText = reply
+      this.popIn()
+    })
+  },
+  /** 打字动画：三个点循环 */
+  startDots() {
+    let i = 0
+    this.dots = DOTS[0]
+    if (this._dotsTimer) clearInterval(this._dotsTimer)
+    this._dotsTimer = setInterval(() => {
+      i = (i + 1) % DOTS.length
+      this.dots = DOTS[i]
+    }, 280)
+  },
+  stopDots() {
+    if (this._dotsTimer) {
+      clearInterval(this._dotsTimer)
+      this._dotsTimer = null
+    }
+    this.thinking = false
+  },
+  /** 气泡弹出：spring 过冲（scale 0.6→1.06→0.98→1）+ 淡入；引擎不支持 transform 时退化为淡入 */
+  popIn() {
+    this.aiOp = 0.4
+    this.aiScale = 0.6
+    const steps = [
+      { op: 0.85, scale: 1.06 },
+      { op: 1, scale: 0.98 },
+      { op: 1, scale: 1 }
+    ]
+    let i = 0
+    const stepTimer = setInterval(() => {
+      if (i >= steps.length) {
+        clearInterval(stepTimer)
+        return
+      }
+      const s = steps[i++]
+      this.aiOp = s.op
+      this.aiScale = s.scale
+    }, 55)
+  }
+}
+</script>

@@ -1,0 +1,366 @@
+<template>
+  <div class="page">
+    <!-- 背景氛围泡泡（最底层）：迷你肥皂泡，随主泡泡材质轮播流转 -->
+    <image class="bg-bubble" src="/common/images/soap_{{soapIdx}}.png" style="left: {{g1x}}px; top: {{g1y}}px; width: 20px; height: 20px; opacity: {{g1o2}};"></image>
+    <image class="bg-bubble" src="/common/images/soap_{{soapIdx}}.png" style="left: {{g2x}}px; top: {{g2y}}px; width: 13px; height: 13px; opacity: {{g2o2}};"></image>
+    <image class="bg-bubble" src="/common/images/soap_{{soapIdx}}.png" style="left: {{g3x}}px; top: {{g3y}}px; width: 26px; height: 26px; opacity: {{g3o2}};"></image>
+
+    <!-- 压力主仪表：脉搏涟漪 + 圆环 + 右下角 AI 入口 -->
+    <div class="ring-wrap">
+      <div class="pulse" style="left: {{pulseM}}px; top: {{pulseM}}px; width: {{pulseSize}}px; height: {{pulseSize}}px; opacity: {{pulseOp}}; border-color: {{ringColor}};"></div>
+      <div class="ring" style="border-color: {{ringColor}};">
+        <text class="stress-num" style="color: {{stressColor}};">{{ stressText }}</text>
+        <text class="stress-label">{{ stressLabel }}</text>
+        <text class="ring-hint">{{ hint }}</text>
+      </div>
+      <div class="ai-entry" onclick="openAssistant">
+        <text class="ai-entry-text">AI</text>
+      </div>
+    </div>
+
+    <!-- 退出应用（右上 45° 圆屏安全区） -->
+    <div class="exit-btn" onclick="exitApp">
+      <text class="exit-icon">✕</text>
+    </div>
+
+    <!-- 心率行 -->
+    <div class="hr-row">
+      <text class="hr-value">{{ hrText }}</text>
+      <text class="hr-unit"> bpm</text>
+    </div>
+
+    <!-- 压力趋势迷你曲线（最近采样柱状图） -->
+    <div class="trend-row" if="{{ trendBars.length }}">
+      <div class="trend-bar" for="{{trendBars}}" style="height: {{$item.h}}px; background-color: {{$item.c}};"></div>
+    </div>
+
+    <!-- 训练模式选择 -->
+    <div class="mode-row">
+      <div class="mode-pill" onclick="setCalmMode" style="background-color: {{ mode === 'calm' ? '#2dd4bf' : '#16233a' }};">
+        <text class="mode-text" style="color: {{ mode === 'calm' ? '#06251f' : '#aeb8c8' }};">平复 4-2-6</text>
+      </div>
+      <div class="mode-pill" onclick="setSleepMode" style="background-color: {{ mode === 'sleep' ? '#8b7ff5' : '#16233a' }};">
+        <text class="mode-text" style="color: {{ mode === 'sleep' ? '#14102e' : '#aeb8c8' }};">助眠 4-7-8</text>
+      </div>
+    </div>
+
+    <!-- 主按钮 -->
+    <div class="btn" onclick="startTraining">
+      <text class="btn-text">{{ mode === 'sleep' ? '开始助眠训练' : '开始呼吸训练' }}</text>
+    </div>
+  </div>
+</template>
+
+<style>
+.page {
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 30px;
+  background-color: #0b1220;
+}
+.bg-bubble {
+  position: absolute;
+}
+.ring-wrap {
+  width: 200px;
+  height: 200px;
+}
+.pulse {
+  position: absolute;
+  border-radius: 100px;
+  border-width: 2px;
+  border-style: solid;
+  background-color: transparent;
+}
+.ring {
+  width: 184px;
+  height: 184px;
+  margin: 8px;
+  border-width: 7px;
+  border-radius: 92px;
+  border-style: solid;
+  background-color: rgba(16, 26, 44, 0.78);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.stress-num {
+  font-size: 46px;
+  font-weight: 700;
+}
+.stress-label {
+  font-size: 18px;
+  color: #aeb8c8;
+  margin-top: 2px;
+}
+.ring-hint {
+  font-size: 12px;
+  color: #5d6b7f;
+  margin-top: 4px;
+}
+.ai-entry {
+  position: absolute;
+  right: 0px;
+  bottom: 0px;
+  width: 56px;
+  height: 56px;
+  border-radius: 28px;
+  background-color: rgba(22, 35, 58, 0.8);
+  background-image: linear-gradient(180deg, rgba(58, 78, 112, 0.6) 0%, rgba(22, 35, 58, 0.4) 100%);
+  border-width: 2px;
+  border-style: solid;
+  border-color: rgba(45, 212, 191, 0.65);
+  align-items: center;
+  justify-content: center;
+}
+.ai-entry-text {
+  font-size: 20px;
+  color: #2dd4bf;
+  font-weight: 700;
+}
+/* 退出应用：右上 45° 圆屏安全区（角落会被裁） */
+.exit-btn {
+  position: absolute;
+  left: 362px;
+  top: 90px;
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  background-color: rgba(22, 35, 58, 0.8);
+  border-width: 1px;
+  border-style: solid;
+  border-color: rgba(255, 255, 255, 0.35);
+  align-items: center;
+  justify-content: center;
+}
+.exit-icon {
+  font-size: 22px;
+  color: #d5dce6;
+}
+.hr-row {
+  flex-direction: row;
+  align-items: flex-end;
+  margin-top: 2px;
+  height: 30px;
+}
+.hr-value {
+  font-size: 28px;
+  color: #ff8a80;
+  font-weight: 600;
+}
+.hr-unit {
+  font-size: 14px;
+  color: #5d6b7f;
+  margin-bottom: 3px;
+}
+.trend-row {
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: center;
+  height: 26px;
+  margin-top: 2px;
+}
+.trend-bar {
+  width: 5px;
+  margin: 0 1px;
+  border-radius: 2px;
+  background-color: #4fc3f7;
+}
+.mode-row {
+  flex-direction: row;
+  justify-content: center;
+  margin-top: 6px;
+}
+.mode-pill {
+  width: 118px;
+  height: 40px;
+  border-radius: 20px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: rgba(255, 255, 255, 0.18);
+  align-items: center;
+  justify-content: center;
+  margin: 0 6px;
+}
+.mode-text {
+  font-size: 20px;
+  font-weight: 600;
+}
+.btn {
+  width: 250px;
+  height: 54px;
+  border-radius: 27px;
+  background-color: #2dd4bf;
+  background-image: linear-gradient(180deg, #5be6d1 0%, #1fb7a2 100%);
+  border-width: 1px;
+  border-style: solid;
+  border-color: rgba(255, 255, 255, 0.4);
+  align-items: center;
+  justify-content: center;
+  margin-top: 8px;
+}
+.btn-text {
+  font-size: 24px;
+  color: #06251f;
+  font-weight: 700;
+}
+</style>
+
+<script>
+import router from '@system.router'
+import app from '@system.app'
+import { subscribe, getRecent, stressLevel, DATA_TYPES } from '../../common/health.js'
+
+const DATA_ERR = '健康数据不可用'
+
+/** 趋势曲线柱数（每根柱对应一次压力采样） */
+const TREND_BARS = 22
+
+/** 压力值 -> 趋势柱高度（5~23px，容器高 26） */
+function trendBarHeight(v) {
+  return 5 + Math.round((Math.min(49, Math.max(1, v)) / 49) * 18)
+}
+
+/** 背景氛围气泡参数：横向基准 + 摆幅 + 上浮速度 */
+const BG_BUBBLES = [
+  { baseX: 90, sway: 26, rise: 9 },
+  { baseX: 330, sway: 20, rise: 7 },
+  { baseX: 210, sway: 34, rise: 11 }
+]
+
+export default {
+  data: {
+    stress: null,
+    hr: null,
+    hint: '连接健康数据…',
+    unsubs: [],
+    mode: 'calm',
+    trendBars: [],
+    pulseSize: 0,
+    pulseM: 0,
+    pulseOp: 0,
+    g1x: 90, g1y: 470, g1o: 0,
+    g2x: 330, g2y: 470, g2o: 0,
+    g3x: 210, g3y: 470, g3o: 0,
+    g1o2: 0, g2o2: 0, g3o2: 0,
+    soapIdx: 0
+  },
+  computed: {
+    stressText() {
+      return this.stress == null ? '--' : String(this.stress)
+    },
+    stressColor() {
+      return stressLevel(this.stress).color
+    },
+    ringColor() {
+      return stressLevel(this.stress).color
+    },
+    stressLabel() {
+      return stressLevel(this.stress).label
+    },
+    hrText() {
+      return this.hr == null ? '--' : String(this.hr)
+    }
+  },
+  onReady() {
+    this.unsubs.push(
+      subscribe(DATA_TYPES.STRESS,
+        (v) => {
+          this.stress = v
+          this.hint = '实时监测中'
+          // 数据到达：圆环荡开一圈脉搏涟漪
+          this.pulseSize = 186
+          this.pulseM = 7
+          this.pulseOp = 0.45
+          // 趋势曲线：滚动窗口，每根柱对应一次采样
+          this._trendRaw = (this._trendRaw || []).concat(v).slice(-TREND_BARS)
+          this.trendBars = this._trendRaw.map((val) => ({
+            h: trendBarHeight(val),
+            c: stressLevel(val).color
+          }))
+        },
+        () => { this.hint = DATA_ERR })
+    )
+    this.unsubs.push(
+      subscribe(DATA_TYPES.HEART_RATE, (v) => { this.hr = v })
+    )
+    // 顺手补一次最近值，让页面秒开有数据
+    getRecent([DATA_TYPES.STRESS, DATA_TYPES.HEART_RATE]).then((map) => {
+      if (this.stress == null && map[DATA_TYPES.STRESS] != null) {
+        this.stress = map[DATA_TYPES.STRESS]
+      }
+      if (this.hr == null && map[DATA_TYPES.HEART_RATE] != null) {
+        this.hr = map[DATA_TYPES.HEART_RATE]
+      }
+    })
+
+    // 氛围动效：脉搏扩散 + 背景气泡慢飘
+    this._fxTick = 0
+    this._fxTimer = setInterval(() => this.animateFx(), 200)
+  },
+  onDestroy() {
+    this.unsubs.forEach((fn) => fn())
+    this.unsubs = []
+    if (this._fxTimer) clearInterval(this._fxTimer)
+  },
+  animateFx() {
+    this._fxTick++
+    // 肥皂泡虹彩轮播：与训练页同款节奏
+    this._st = (this._st || 0) + 1
+    if (this._st % 4 === 0) {
+      this.soapIdx = (this.soapIdx + 1) % 8
+    }
+    // 脉搏涟漪扩散淡出
+    if (this.pulseOp > 0) {
+      this.pulseSize = this.pulseSize + 5
+      this.pulseM = Math.round((200 - this.pulseSize) / 2)
+      this.pulseOp = Math.max(0, Math.round((this.pulseOp - 0.05) * 100) / 100)
+    }
+    // 背景气泡自下而上慢飘，带横向摆动
+    for (let i = 0; i < BG_BUBBLES.length; i++) {
+      const cfg = BG_BUBBLES[i]
+      const idx = i + 1
+      const t = (this._fxTick % 45) / 45
+      let y = 470 - t * 500
+      if (y < -24) {
+        y = 470
+      }
+      this['g' + idx + 'x'] = Math.round(cfg.baseX + cfg.sway * Math.sin(t * 6.28 + i * 2))
+      this['g' + idx + 'y'] = Math.round(y)
+      this['g' + idx + 'o'] = Math.round((0.06 + 0.05 * Math.sin(t * 3.14)) * 100) / 100
+      // 贴图自带高光，透明度单独给一档（原 g*o 太淡，贴图会被淹没）
+      this['g' + idx + 'o2'] = Math.round((0.5 + 0.4 * Math.sin(t * 3.14 + i)) * 100) / 100
+    }
+  },
+  setCalmMode() {
+    this.mode = 'calm'
+  },
+  setSleepMode() {
+    this.mode = 'sleep'
+  },
+  startTraining() {
+    router.push({
+      uri: 'pages/breathing',
+      params: { currentStress: this.stress, currentHr: this.hr, patternKey: this.mode }
+    })
+  },
+  openAssistant() {
+    router.push({ uri: 'pages/assistant' })
+  },
+  exitApp() {
+    // 停掉动效定时器再退出，避免引擎在退出动画期间继续回调
+    if (this._fxTimer) clearInterval(this._fxTimer)
+    this.unsubs.forEach((fn) => fn())
+    this.unsubs = []
+    // 本引擎（vela-miwear-watch-5.0）@system.app 导入为空对象，退出入口在 $app 上
+    if (typeof this.$app.exit === 'function') {
+      this.$app.exit()
+    } else if (typeof app.exit === 'function') {
+      app.exit()
+    } else {
+      console.warn('[exitApp] no exit api available')
+    }
+  }
+}
+</script>
