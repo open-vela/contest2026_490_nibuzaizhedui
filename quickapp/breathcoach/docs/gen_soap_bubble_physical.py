@@ -1,24 +1,32 @@
 # -*- coding: utf-8 -*-
 """
-物理正确的肥皂泡薄膜干涉序列帧（soap_0..7.png, 384x384）。
-移植自 Shadertoy "Physically-Based Soap Bubble" (XtKyRK) 的物理思路：
-  R(λ) = r1² + r2² + 2·r1·r2·cos(4π·n·d·cosθt/λ + π)
-  - 皂膜折射率 n=1.33，r1=(1-n)/(1+n)（含 π 相位突变），r2=(n-1)/(n+1)
-  - 膜厚随高度排流变薄：顶部 ~40nm（薄到出现"黑膜"->透明），底部 ~600nm
-  - 入射角随半径增大（边缘掠射），cosθt = sqrt(1 - (sinθi/n)²)
-  - 48 个波长采样（400-700nm）按 RGB 敏感度加权积分出颜色
-艺术化处理：反射率物理上仅 ~4%，暗背景下不可见，整体增益 ×5；
-叠加轻微涡流扰动让膜厚场流动（帧间推进相位）。
+肥皂泡 v2「暗底虹彩」序列帧（soap_0..7.png, 384x384 RGBA）。
+
+物理内核沿用 v1（Shadertoy "Physically-Based Soap Bubble" 的薄膜干涉思路），
+v2 针对手表圆屏可读性重做美术方向：
+  1. 深蓝玻璃球体基底（近不透明），与表盘 #0b1220 融为一体，室外强光下相位文字可读；
+  2. 虹彩只出现在中带/边缘的薄膜高光（真实皂膜油膜反光的形态），中心区让位给文字；
+  3. 粉彩化 + 饱和度硬上限 S<=0.59、明度上限 V<=0.88，杜绝"气象图"式全谱荧光；
+  4. 中心烘焙径向暗化（scrim），保证相位标签（#e6fffb）对比度 >= 4.5:1。
+注意：v1 的 HSV 后处理走 PIL convert("HSV") 会丢 alpha（帧变实心圆盘），v2 改为
+numpy 内按公式钳制 S/V，RGB/alpha 全程分离。
+输出：../src/common/images/soap_0..7.png + ./soap_preview.png（4x2 预览）
+数值验收：./check_bubble_contrast.py
 """
-from PIL import Image, ImageDraw, ImageFilter
-import numpy as np
+import os
 import math
+import numpy as np
+from PIL import Image, ImageDraw, ImageFilter
 
 S = 384
 C = S / 2
 R = S / 2 - 3
 N_FRAMES = 8
 N = 1.33
+
+_DOC_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_DIR = os.path.dirname(_DOC_DIR)
+IMG_DIR = os.path.join(_PROJECT_DIR, "src", "common", "images")
 
 yy, xx = np.mgrid[0:S, 0:S].astype(np.float32)
 dx = xx - C
@@ -27,68 +35,122 @@ r = np.sqrt(dx * dx + dy * dy) / R
 theta = np.arctan2(dy, dx).astype(np.float32)
 inside = (r <= 1.0)
 
-# 掠射角：中心正入射，边缘接近掠射
 sin_i = np.clip(r, 0, 0.95).astype(np.float32)
-cos_t = np.sqrt(1.0 - (sin_i / N) ** 2)          # 折射角余弦
+cos_t = np.sqrt(1.0 - (sin_i / N) ** 2)
 
-# 排流膜厚：顶部薄（yn=+1）底部厚；含 4π/n 无量纲化：D = n·d·cosθt 直接以 nm 计
-yn = (-dy / R).astype(np.float32)                 # 顶部 +1
-d_base = 40.0 + (400.0 - 40.0) * (1 - yn) / 2.0   # 40..400 nm：条纹更少更柔
+yn = (-dy / R).astype(np.float32)
+d_base = 40.0 + (400.0 - 40.0) * (1 - yn) / 2.0
 
-# 波长采样与 RGB 敏感度
 lam = np.linspace(400, 700, 48).astype(np.float32)
 wR = np.exp(-((lam - 610) / 65) ** 2)
 wG = np.exp(-((lam - 545) / 65) ** 2)
 wB = np.exp(-((lam - 465) / 55) ** 2)
-W = np.stack([wR, wG, wB], axis=1)                # (48,3)
+W = np.stack([wR, wG, wB], axis=1)
 W /= W.sum(axis=0, keepdims=True)
 
-r1 = (1 - N) / (1 + N)                            # -0.142
-r2 = (N - 1) / (N + 1)                            # +0.142
-base_r = r1 * r1 + r2 * r2                        # 0.0401
-cross = 2 * r1 * r2                               # -0.0401
+r1 = (1 - N) / (1 + N)
+r2 = (N - 1) / (N + 1)
+base_r = r1 * r1 + r2 * r2
+cross = 2 * r1 * r2
 
-GAIN_HUE = 3.0    # 色相分离度（只影响颜色方向，不影响透明度）
-SWIRL = 25.0      # 涡流扰动幅度 (nm)：排流条纹为主，涡流只做轻微扰动
+SWIRL = 25.0
+
+# v2 视觉参数
+S_MAX = 0.58        # 饱和度硬上限（气象图防线）
+V_MAX = 225.0       # 明度硬上限 (0.88)
+S_BOOST = 1.7       # 色带提饱和系数（提完仍被 S_MAX 封顶）
+CENTER_CUT0 = 0.32  # 中心无虹彩区（文字让位），0.32~0.50 渐入
+
+# v1 粉彩色板：淡粉 -> 青 -> 金 -> 浅紫（五彩的来源，与 AI 助手气泡同色板）
+PALETTE = np.array([
+    [255, 196, 210],
+    [154, 232, 240],
+    [255, 226, 158],
+    [206, 184, 252]
+], dtype=np.float32)
+
+
+def palette_color(t_norm):
+    """膜厚相位 -> 粉彩色板循环插值 (S,S,3)"""
+    n = PALETTE.shape[0]
+    x = (t_norm % 1.0) * n
+    i = np.floor(x).astype(np.int32) % n
+    j = (i + 1) % n
+    f = (x - np.floor(x))[:, :, None]
+    return PALETTE[i] * (1 - f) + PALETTE[j] * f
+
+
+def clamp_sv(rgb, s_ceiling=S_MAX):
+    """矢量版 S/V 钳制（不经过 PIL，保住 alpha）"""
+    V = rgb.max(axis=2, keepdims=True)
+    Ssat = (V - rgb.min(axis=2, keepdims=True)) / np.maximum(V, 1e-6)
+    f = np.where(Ssat > s_ceiling, s_ceiling / np.maximum(Ssat, 1e-6), 1.0)
+    rgb = V - (V - rgb) * f
+    scale = np.where(V > V_MAX, V_MAX / np.maximum(V, 1e-6), 1.0)
+    return rgb * scale
+
+
+def boost_sat(rgb):
+    """提饱和：S' = min(S*BOOST, S_MAX)（往灰轴反向拉）"""
+    V = rgb.max(axis=2, keepdims=True)
+    Ssat = (V - rgb.min(axis=2, keepdims=True)) / np.maximum(V, 1e-6)
+    k = np.minimum(S_BOOST, S_MAX / np.maximum(Ssat, 1e-6))
+    return V - (V - rgb) * k
+
 
 def render_frame(k):
     p = k / N_FRAMES * 2 * math.pi
-    # 涡流：慢速表面流让膜厚场不是死板的水平条纹
     swirl = (np.sin(theta * 2 + r * 4 + p) * 0.55 +
              np.sin(theta * 3 - r * 6 - p * 0.7) * 0.30 +
              np.sin(theta * 1 + r * 2 + p * 1.4) * 0.35)
     d = d_base + swirl.astype(np.float32) * SWIRL * (0.4 + 0.6 * (1 - yn))
     d = np.clip(d, 8.0, 900.0)
 
-    # 光程差相位：δ = 4π·n·d·cosθt/λ，r1 带 π 突变并入 cross 符号
     accum = np.zeros((S, S, 3), dtype=np.float32)
     for li in range(len(lam)):
         delta = (4 * math.pi * N * d * cos_t / lam[li]).astype(np.float32) + math.pi
-        refl = base_r + cross * np.cos(delta)      # R(λ) ∈ [0, 0.08]
+        refl = base_r + cross * np.cos(delta)
         refl = np.clip(refl, 0, 0.08)
         for ch in range(3):
             accum[:, :, ch] += refl * W[li, ch]
 
-    # 物理反射率 0..0.08 -> 相对值 0..1；平滑曲线：相消处真透明，不硬裁
     phys = accum.mean(axis=2) / 0.08
-    hue = accum / (accum.max(axis=2)[:, :, None] + 1e-9)        # 最大通道归一
-    hue = hue * 0.78 + 1.0 * 0.22                                # 粉彩化：向白混 22%
-    alpha = (np.clip(phys, 0, 1) ** 0.8) * 175 * inside
-    rgb = (np.clip(hue, 0, 1) * 255).astype(np.uint8)
-    out = np.dstack([rgb, alpha.astype(np.uint8)])
-    frame = Image.fromarray(out, "RGBA")
-    # 后期：HSV 饱和度增强（干涉宽带色偏灰，摄影后期同款手法）
-    hsv = np.array(frame.convert("HSV"), dtype=np.float32)
-    hsv[:, :, 1] = np.clip(hsv[:, :, 1] * 1.7, 0, 255)
-    frame = Image.fromarray(hsv.astype(np.uint8), "HSV").convert("RGBA")
-    # 柔焦：去掉 λ 积分的带状硬边，更像微距摄影的景深
-    frame = frame.filter(ImageFilter.GaussianBlur(1.2))
+    hue = accum / (accum.max(axis=2)[:, :, None] + 1e-9)
 
-    # 极淡膜面本体
-    body = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    bd = ImageDraw.Draw(body)
-    bd.ellipse([C - R, C - R, C + R, C + R], fill=(215, 238, 250, 16))
+    # 五彩来源：物理干涉色 与 粉彩色板（膜厚相位驱动循环）55:45 混合
+    # ×1.8：实际膜厚范围只覆盖归一化区间的前 ~55%，放大让淡粉也进循环
+    t_norm = (d - 8.0) / (900.0 - 8.0) * 1.8
+    pal = palette_color(t_norm)
+    rgb = np.clip(hue, 0, 1) * 255 * 0.55 + pal * 0.45
+    rgb = boost_sat(rgb)
+    rgb = clamp_sv(rgb)
+
+    # 虹彩只在中带 + 边缘出现；中心为文字让位
+    band = 0.30 + 0.70 * np.exp(-((r - 0.62) ** 2) / 0.09)
+    rim_glow = 0.55 * np.exp(-((r - 0.93) ** 2) / 0.008)
+    center_cut = np.clip((r - CENTER_CUT0) / 0.18, 0, 1) ** 1.1
+    vis = (band + rim_glow) * center_cut
+
+    alpha = (np.clip(phys, 0, 1) ** 0.85) * 190 * vis * inside
+
+    irid = np.dstack([np.clip(rgb, 0, 255).astype(np.uint8),
+                      np.clip(alpha, 0, 255).astype(np.uint8)])
+    frame = Image.fromarray(irid, "RGBA").filter(ImageFilter.GaussianBlur(1.2))
+
+    # 深蓝玻璃球基底：近不透明，中心略深边缘略亮的径向渐变
+    t = np.clip(r, 0, 1)[:, :, None]
+    body_rgb = (np.array([13, 21, 36]) * (1 - t) + np.array([27, 41, 66]) * t)
+    body_a = (240 - 16 * np.clip(r, 0, 1)) * inside
+    body = Image.fromarray(np.dstack([body_rgb.astype(np.uint8),
+                                      body_a.astype(np.uint8)]), "RGBA")
     frame = Image.alpha_composite(body, frame)
+
+    # 中心烘焙暗化（scrim）：文字底布直接进贴图
+    scrim_a = (190 * np.clip((0.68 - r) / 0.52, 0, 1) ** 1.25 * inside).astype(np.uint8)
+    scrim = Image.fromarray(np.dstack([np.full((S, S), 11, np.uint8),
+                                       np.full((S, S), 18, np.uint8),
+                                       np.full((S, S), 32, np.uint8), scrim_a]), "RGBA")
+    frame = Image.alpha_composite(frame, scrim)
 
     # 边缘折射白线（柔焦）
     rim_line = Image.new("RGBA", (S, S), (0, 0, 0, 0))
@@ -102,12 +164,12 @@ def render_frame(k):
     hx, hy = C - R * 0.42, C - R * 0.46
     hl = Image.new("RGBA", (S, S), (0, 0, 0, 0))
     hld = ImageDraw.Draw(hl)
-    hld.ellipse([hx - 26, hy - 26, hx + 26, hy + 26], fill=(255, 255, 255, 55))
+    hld.ellipse([hx - 26, hy - 26, hx + 26, hy + 26], fill=(255, 255, 255, 50))
     hl = hl.filter(ImageFilter.GaussianBlur(14))
     frame = Image.alpha_composite(frame, hl)
     core = Image.new("RGBA", (S, S), (0, 0, 0, 0))
     cd = ImageDraw.Draw(core)
-    cd.ellipse([hx - 9, hy - 9, hx + 9, hy + 9], fill=(255, 255, 255, 230))
+    cd.ellipse([hx - 9, hy - 9, hx + 9, hx + 9], fill=(255, 255, 255, 220))
     core = core.filter(ImageFilter.GaussianBlur(2.5))
     frame = Image.alpha_composite(frame, core)
 
@@ -118,10 +180,11 @@ def render_frame(k):
     frame.putalpha(Image.composite(frame.split()[3], Image.new("L", (S, S), 0), mask))
     return frame
 
+
 frames = []
 for k in range(N_FRAMES):
     fr = render_frame(k)
-    out = rf"C:\Users\LAINXIANG\Desktop\小米\breathcoach\src\common\images\soap_{k}.png"
+    out = os.path.join(IMG_DIR, f"soap_{k}.png")
     fr.save(out)
     frames.append(fr)
     print("saved", out)
@@ -129,5 +192,5 @@ for k in range(N_FRAMES):
 prev = Image.new("RGB", (S * 4, S * 2), (11, 18, 32))
 for i, fr in enumerate(frames):
     prev.paste(fr, ((i % 4) * S, (i // 4) * S), fr)
-prev.save(r"C:\Users\LAINXIANG\Desktop\小米\breathcoach\docs\soap_preview.png")
+prev.save(os.path.join(_DOC_DIR, "soap_preview.png"))
 print("preview saved")
