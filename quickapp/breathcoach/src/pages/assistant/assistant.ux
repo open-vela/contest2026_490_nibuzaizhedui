@@ -46,7 +46,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding-top: 28px;
+  padding-top: 20px;
   background-color: #0b1220;
 }
 /* 标题行整体可点返回：← 在圆屏安全区内 */
@@ -67,19 +67,21 @@
   margin-bottom: 0px;
 }
 .row-right {
-  width: 420px;
+  width: 466px;
   flex-direction: row;
   justify-content: flex-end;
-  margin-top: 6px;
+  padding-right: 70px;
+  margin-top: 8px;
 }
 .row-left {
-  width: 420px;
+  width: 466px;
   flex-direction: row;
   justify-content: flex-start;
-  margin-top: 6px;
+  padding-left: 70px;
+  margin-top: 8px;
 }
 .msg-user {
-  max-width: 280px;
+  max-width: 240px;
   /* 虹彩粉彩渐变：与训练页肥皂泡同一套色板（淡粉-青-金-浅紫） */
   background-color: #2dd4bf;
   background-image: linear-gradient(135deg, rgba(255, 196, 210, 0.9) 0%, rgba(154, 232, 240, 0.9) 50%, rgba(255, 226, 158, 0.9) 100%);
@@ -87,25 +89,25 @@
   border-style: solid;
   border-color: rgba(255, 255, 255, 0.5);
   border-radius: 16px 16px 4px 16px;
-  padding: 8px 14px;
+  padding: 7px 12px;
 }
 .msg-user-text {
-  font-size: 18px;
+  font-size: 17px;
   color: #0a2a30;
   font-weight: 600;
-  line-height: 24px;
+  line-height: 23px;
 }
 /* iMessage 玻璃气泡：半透明渐变 + 细亮边 + 顶部高光条 */
 .msg-ai {
-  width: 330px;
-  min-height: 84px;
+  width: 326px;
+  min-height: 72px;
   background-color: rgba(16, 26, 44, 0.72);
   background-image: linear-gradient(180deg, rgba(48, 66, 96, 0.55) 0%, rgba(16, 26, 44, 0.35) 100%);
   border-width: 1px;
   border-style: solid;
   border-color: rgba(255, 255, 255, 0.22);
   border-radius: 16px 16px 16px 4px;
-  padding: 12px 16px;
+  padding: 10px 14px;
 }
 .msg-ai-shine {
   position: absolute;
@@ -118,20 +120,20 @@
   background-image: linear-gradient(90deg, rgba(255, 196, 210, 0.30) 0%, rgba(154, 232, 240, 0.30) 50%, rgba(206, 184, 252, 0.30) 100%);
 }
 .msg-ai-text {
-  font-size: 18px;
+  font-size: 17px;
   color: #d5dce6;
-  line-height: 24px;
+  line-height: 23px;
   text-align: left;
-  lines: 4;
+  lines: 5;
   text-overflow: ellipsis;
 }
 .chips-row1 {
   flex-direction: row;
-  margin-top: 12px;
+  margin-top: 10px;
 }
 .chips-row2 {
   flex-direction: row;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 .chip {
   background-color: rgba(22, 35, 58, 0.75);
@@ -141,10 +143,10 @@
   border-color: rgba(255, 255, 255, 0.18);
   border-radius: 20px;
   padding: 6px 10px;
-  margin: 0 6px;
+  margin: 0 5px;
 }
 .chip-text {
-  font-size: 16px;
+  font-size: 15px;
   color: #8fb8d8;
 }
 </style>
@@ -166,16 +168,16 @@ export default {
     aiScale: 1
   },
   onReady() {
-    // 页面打开即感知当前压力，作为回答上下文
+    // 页面打开即感知当前压力，作为回答上下文（展示紧凑格式，气泡不溢出）
     getRecent([DATA_TYPES.STRESS, DATA_TYPES.HEART_RATE]).then((map) => {
       if (this.thinking) {
         return
       }
       const s = map[DATA_TYPES.STRESS]
       const hr = map[DATA_TYPES.HEART_RATE]
-      const env = aiAvailable() ? '端侧 AI 已连接' : '端侧 AI 未连接（本地建议模式）'
-      const ctx = (s != null ? '当前压力 ' + s + '（' + stressLevel(s).label + '）' : '') +
-        (hr != null ? '，心率 ' + hr + ' bpm' : '')
+      const env = aiAvailable() ? '端侧 AI 已连接' : '本地建议模式'
+      const ctx = (s != null ? '压力 ' + s + ' ' + stressLevel(s).label : '') +
+        (hr != null ? (s != null ? ' · ' : '') + '心率 ' + hr : '')
       this.replyText = env + (ctx ? '\n' + ctx : '')
       this._ctx = ctx
       this._hrCtx = hr != null ? hr : null
@@ -191,25 +193,25 @@ export default {
     router.back()
   },
   askStress() {
-    const s = this._ctx ? this._ctx : ''
-    this.submit('我的压力' + (s ? '' : '怎么样') + '？' + s)
+    this.submit('我的压力怎么样？', '我的压力怎么样？' + (this._ctx ? '，当前' + this._ctx : ''))
   },
   askRelax() {
-    this.submit('给我几条适合现在做的放松建议')
+    this.submit('给我放松建议', '给我几条适合现在做的放松建议')
   },
   askHr() {
-    const hr = this._hrCtx != null ? '我心率 ' + this._hrCtx + '，' : ''
-    this.submit(hr + '我的心率正常吗？')
+    this.submit('我的心率正常吗？',
+      (this._hrCtx != null ? '我心率 ' + this._hrCtx + '，' : '') + '我的心率正常吗？')
   },
   askSleep() {
-    this.submit('怎么睡个好觉')
+    this.submit('怎么睡个好觉', '怎么睡个好觉')
   },
-  submit(q) {
-    this.lastQuestion = q
+  /** display: 气泡里展示的短句；query: 实际发给 AI 的完整问题（可带上下文） */
+  submit(display, query) {
+    this.lastQuestion = display
     this.thinking = true
     this.replyText = ''
     this.startDots()
-    ask(q, (reply) => {
+    ask(query || display, (reply) => {
       this.stopDots()
       this.replyText = reply
       this.popIn()
