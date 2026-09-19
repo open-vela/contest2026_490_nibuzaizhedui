@@ -9,6 +9,11 @@
 from PIL import Image, ImageDraw, ImageFilter
 import numpy as np
 import math
+import os
+
+_DOC_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_DIR = os.path.dirname(_DOC_DIR)
+IMG_DIR = os.path.join(_PROJECT_DIR, "src", "common", "images")
 
 S = 384
 C = S / 2
@@ -92,7 +97,7 @@ for k in range(N_FRAMES):
     md.ellipse([C - R, C - R, C + R, C + R], fill=255)
     frame.putalpha(Image.composite(frame.split()[3], Image.new("L", (S, S), 0), mask))
 
-    out = rf"C:\Users\LAINXIANG\Desktop\小米\breathcoach\src\common\images\soap_{k}.png"
+    out = os.path.join(IMG_DIR, f"soap_{k}.png")
     frame.save(out)
     frames.append(frame)
     print("saved", out)
@@ -101,5 +106,5 @@ for k in range(N_FRAMES):
 prev = Image.new("RGB", (S * 4, S), (11, 18, 32))
 for i, fr in enumerate(frames):
     prev.paste(fr, (i * S, 0), fr)
-prev.save(r"C:\Users\LAINXIANG\Desktop\小米\breathcoach\docs\soap_preview.png")
+prev.save(os.path.join(_DOC_DIR, "soap_preview_v1_pastel.png"))
 print("preview saved")
