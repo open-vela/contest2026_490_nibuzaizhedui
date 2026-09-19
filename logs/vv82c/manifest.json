@@ -1,0 +1,29 @@
+{
+  "schema_version": "1.0",
+  "team_id": "contest2026_490_nibuzaizhedui",
+  "github_login": "vv82c",
+  "generator": "zcode-log-export",
+  "sessions": [
+    {
+      "session_id": "sess_89a92c7a-8c07-42c9-9ddd-847b49563bd9",
+      "tool": "zcode",
+      "started_at": "2026-09-18T15:32:17.974Z",
+      "last_event_at": "2026-09-19T07:13:22.151Z",
+      "event_count": 71,
+      "file_path": "logs/vv82c/2026-09-18/zcode__sess_89a92c7a-8c07-42c9-9ddd-847b49563bd9.jsonl",
+      "collection_mode": "cli",
+      "health": "ok"
+    },
+    {
+      "session_id": "sess_e7996881-90a1-4f28-b037-03bc155041d3",
+      "tool": "zcode",
+      "started_at": "2026-09-18T05:24:54.862Z",
+      "last_event_at": "2026-09-19T07:13:39.417Z",
+      "event_count": 292,
+      "file_path": "logs/vv82c/2026-09-18/zcode__sess_e7996881-90a1-4f28-b037-03bc155041d3.jsonl",
+      "collection_mode": "cli",
+      "health": "ok"
+    }
+  ],
+  "updated_at": "2026-09-19T07:13:39.417Z"
+}

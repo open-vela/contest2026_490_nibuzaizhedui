@@ -1,10 +1,11 @@
 node_modules/
-dist/
+dist/*
 build/
 sign/
 .build/
 .temp_*/
 *.rpk
+!quickapp/breathcoach/dist/com.vela.breathcoach.release.*.rpk
 .DS_Store
 Thumbs.db
 *.log
